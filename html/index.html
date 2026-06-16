@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mookia 3310</title>
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+    <div id="app" class="hidden">
+        <div class="phone-shell" aria-label="Mookia phone">
+            <img class="phone-bg" src="assets/phone.png" alt="" draggable="false" />
+
+            <div class="screen">
+                <div class="status">
+                    <span id="status-left">Mookia</span>
+                    <span id="status-right">14:47</span>
+                </div>
+                <div id="view" class="view"></div>
+                <div class="softbar">
+                    <span id="soft-left">Select</span>
+                    <span id="soft-mid">▲▼</span>
+                    <span id="soft-right">Exit</span>
+                </div>
+            </div>
+
+            <div class="key-label label-back">C</div>
+            <div class="key-label label-select"></div>
+            <div class="key-label label-up">▲</div>
+            <div class="key-label label-down">▼</div>
+
+            <div class="key-label label-1"><strong>1</strong></div>
+            <div class="key-label label-2"><strong>2</strong><small>abc</small></div>
+            <div class="key-label label-3"><strong>3</strong><small>def</small></div>
+            <div class="key-label label-4"><strong>4</strong><small>ghi</small></div>
+            <div class="key-label label-5"><strong>5</strong><small>jkl</small></div>
+            <div class="key-label label-6"><strong>6</strong><small>mno</small></div>
+            <div class="key-label label-7"><strong>7</strong><small>pqrs</small></div>
+            <div class="key-label label-8"><strong>8</strong><small>tuv</small></div>
+            <div class="key-label label-9"><strong>9</strong><small>wxyz</small></div>
+            <div class="key-label label-star"><strong>*</strong><small>+</small></div>
+            <div class="key-label label-0"><strong>0</strong><small>_</small></div>
+            <div class="key-label label-hash"><strong>#</strong></div>
+
+            <button data-key="right" class="hit hit-back" aria-label="Clear / Back"></button>
+            <button data-key="select" class="hit hit-select" aria-label="Menu / Select"></button>
+            <button data-key="up" class="hit hit-up" aria-label="Up"></button>
+            <button data-key="down" class="hit hit-down" aria-label="Down"></button>
+
+            <button data-key="1" class="hit hit-1" aria-label="1"></button>
+            <button data-key="2" class="hit hit-2" aria-label="2 abc"></button>
+            <button data-key="3" class="hit hit-3" aria-label="3 def"></button>
+            <button data-key="4" class="hit hit-4" aria-label="4 ghi"></button>
+            <button data-key="5" class="hit hit-5" aria-label="5 jkl"></button>
+            <button data-key="6" class="hit hit-6" aria-label="6 mno"></button>
+            <button data-key="7" class="hit hit-7" aria-label="7 pqrs"></button>
+            <button data-key="8" class="hit hit-8" aria-label="8 tuv"></button>
+            <button data-key="9" class="hit hit-9" aria-label="9 wxyz"></button>
+            <button data-key="star" class="hit hit-star" aria-label="Star"></button>
+            <button data-key="0" class="hit hit-0" aria-label="0"></button>
+            <button data-key="hash" class="hit hit-hash" aria-label="Hash"></button>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,2 @@
+-- Server-specific bridge extension point.
+-- Main bridge helpers are loaded from bridge/shared.lua.

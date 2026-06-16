@@ -1,0 +1,26 @@
+OX INVENTORY
+
+    ['phone'] = {
+        label = '3210 Mobile',
+        weight = 190,
+        stack = false,
+        consume = 0,
+        client = {
+            export = 'blixt-mokia.openPhone'
+        }
+    },
+
+QB INVENTORY
+
+['phone'] = {
+    ['name'] = 'phone',
+    ['label'] = 'Mookia Phone',
+    ['weight'] = 700,
+    ['type'] = 'item',
+    ['image'] = 'phone.png',
+    ['unique'] = false,
+    ['useable'] = true,
+    ['shouldClose'] = true,
+    ['combinable'] = nil,
+    ['description'] = 'The 3210 with snake!'
+},

@@ -1,0 +1,925 @@
+* {
+    box-sizing: border-box;
+    user-select: none;
+}
+
+:root {
+    --lcd-bg: #9fb571;
+    --lcd-bg-soft: #b5c786;
+    --lcd-dark: #1d2b16;
+    --lcd-line: rgba(29, 43, 22, 0.34);
+    --lcd-active: #233318;
+}
+
+body {
+    margin: 0;
+    overflow: hidden;
+    font-family: "Courier New", monospace;
+}
+
+.hidden {
+    display: none !important;
+}
+
+#app {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-end;
+    padding: 0 52px 24px 0;
+}
+
+.phone-shell {
+    position: relative;
+    width: min(33.5vh, 335px);
+    aspect-ratio: 1 / 2;
+    filter: drop-shadow(0 24px 34px rgba(0, 0, 0, 0.58));
+}
+
+.phone-bg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    pointer-events: none;
+}
+
+.screen {
+    position: absolute;
+    left: 24.0%;
+    top: 21.8%;
+    width: 49.9%;
+    height: 27.0%;
+    padding: 2.2% 2.4%;
+    border-radius: 4.2% / 5.8%;
+    background:
+        linear-gradient(180deg, rgba(255,255,255,.08), rgba(0,0,0,.03)),
+        repeating-linear-gradient(0deg, rgba(255,255,255,.035) 0 1px, transparent 1px 3px),
+        var(--lcd-bg);
+    color: var(--lcd-dark);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    text-shadow: 0 1px rgba(255,255,255,.14);
+    box-shadow: inset 0 0 12px rgba(0,0,0,.18);
+}
+
+.status {
+    height: 15.5%;
+    min-height: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 4px;
+    font-size: clamp(8px, 1.16vh, 12px);
+    line-height: 1;
+    font-weight: 900;
+    border-bottom: 1px solid var(--lcd-line);
+}
+
+.view {
+    flex: 1;
+    padding: 4px 1px;
+    overflow: hidden;
+}
+
+.softbar {
+    height: 16%;
+    min-height: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 4px;
+    padding-top: 2px;
+    font-size: clamp(8px, 1.08vh, 11px);
+    line-height: 1;
+    font-weight: 900;
+    border-top: 1px solid var(--lcd-line);
+}
+
+.title {
+    font-weight: 900;
+    text-align: center;
+    margin: 0 0 5px;
+    padding-bottom: 3px;
+    border-bottom: 1px solid var(--lcd-line);
+    text-transform: uppercase;
+    font-size: clamp(10px, 1.38vh, 14px);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.menu-item {
+    height: clamp(14px, 2.05vh, 20px);
+    line-height: clamp(14px, 2.05vh, 20px);
+    font-size: clamp(9px, 1.42vh, 14px);
+    font-weight: 900;
+    padding: 0 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.menu-item.selected {
+    background: var(--lcd-active);
+    color: var(--lcd-bg-soft);
+}
+
+.small {
+    font-size: clamp(8px, 1.05vh, 11px);
+}
+
+.center {
+    text-align: center;
+}
+
+.big-icon {
+    font-size: clamp(32px, 5.6vh, 56px);
+    line-height: 1.15;
+    text-align: center;
+    font-weight: 900;
+}
+
+.input {
+    min-height: 24px;
+    border: 2px solid var(--lcd-dark);
+    padding: 4px;
+    margin: 6px 0;
+    font-weight: 900;
+    font-size: clamp(10px, 1.35vh, 14px);
+    overflow-wrap: anywhere;
+}
+
+.message-list {
+    height: 100%;
+    overflow: hidden;
+}
+
+.bubble {
+    margin: 3px 0;
+    padding: 3px;
+    border: 1px solid rgba(27,38,22,.5);
+    font-size: clamp(8px, 1.05vh, 11px);
+    line-height: 1.08;
+}
+
+.bubble.out {
+    text-align: right;
+}
+
+button.hit {
+    position: absolute;
+    appearance: none;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    background: rgba(111, 215, 245, 0);
+    cursor: pointer;
+    border-radius: 999px;
+    outline: none;
+}
+
+button.hit:active {
+    background: rgba(111, 215, 245, 0.18);
+    box-shadow: inset 0 0 12px rgba(255,255,255,.25);
+}
+
+/* Top control cluster: percentage hitboxes are mapped to html/assets/phone.png. */
+.hit-back { left: 19.1%; top: 53.5%; width: 17.5%; height: 5.5%; transform: rotate(-17deg); border-radius: 34% 42% 39% 44%; }
+.hit-select { left: 38.0%; top: 53.9%; width: 22.5%; height: 4.5%; border-radius: 44% 44% 55% 55%; }
+.hit-up { left: 59.4%; top: 54.0%; width: 16.0%; height: 4.4%; transform: rotate(-19deg); border-radius: 42% 40% 34% 34%; }
+.hit-down { left: 58.5%; top: 57.8%; width: 13.0%; height: 4.4%; transform: rotate(-19deg); border-radius: 34% 34% 42% 40%; }
+
+/* Numeric keypad
+   These hitboxes are intentionally a little larger than the printed button faces,
+   but their centres now match the actual button centres in phone.png. */
+.hit-1    { left: 21.6%; top: 63.9%; width: 17.0%; height: 4.6%; transform: rotate(10deg); }
+.hit-2    { left: 40.8%; top: 64.8%; width: 17.0%; height: 4.6%; }
+.hit-3    { left: 59.7%; top: 63.9%; width: 17.0%; height: 4.6%; transform: rotate(-10deg); }
+
+.hit-4    { left: 22.2%; top: 70.1%; width: 17.0%; height: 4.6%; transform: rotate(10deg); }
+.hit-5    { left: 41.4%; top: 71.0%; width: 17.0%; height: 4.6%; }
+.hit-6    { left: 60.0%; top: 70.1%; width: 17.0%; height: 4.6%; transform: rotate(-10deg); }
+
+.hit-7    { left: 23.0%; top: 76.3%; width: 17.0%; height: 4.6%; transform: rotate(10deg); }
+.hit-8    { left: 41.4%; top: 77.3%; width: 17.0%; height: 4.6%; }
+.hit-9    { left: 59.7%; top: 76.3%; width: 17.0%; height: 4.6%; transform: rotate(-10deg); }
+
+.hit-star { left: 23.0%; top: 82.7%; width: 17.0%; height: 4.6%; transform: rotate(10deg); }
+.hit-0    { left: 40.8%; top: 83.5%; width: 17.0%; height: 4.6%; }
+.hit-hash { left: 59.1%; top: 82.7%; width: 17.0%; height: 4.6%; transform: rotate(-10deg); }
+
+@media (max-height: 760px) {
+    #app {
+        padding-right: 16px;
+        padding-bottom: 10px;
+    }
+
+    .phone-shell {
+        width: min(39vh, 300px);
+    }
+}
+
+/* Interactive printed labels layered over the blank phone artwork. */
+.key-label {
+    position: absolute;
+    z-index: 2;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    color: rgba(24, 31, 32, 0.88);
+    font-family: Arial, Helvetica, sans-serif;
+    font-weight: 800;
+    line-height: 1;
+    text-align: center;
+    text-shadow: 0 1px rgba(255, 255, 255, 0.36);
+}
+
+.key-label strong {
+    font-size: clamp(10px, 1.38vh, 14px);
+    line-height: 1;
+}
+
+.key-label small {
+    font-size: clamp(5px, 0.68vh, 7px);
+    font-weight: 900;
+    letter-spacing: -0.35px;
+    line-height: 1;
+    margin-top: 2px;
+}
+
+.label-back   { left: 20.1%; top: 55.2%; width: 14.5%; height: 2.8%; transform: rotate(-17deg); font-size: clamp(8px, 1.05vh, 11px); }
+.label-select { left: 39.3%; top: 54.0%; width: 20.0%; height: 2.2%; font-size: clamp(6px, 0.82vh, 9px); color: rgba(28, 45, 52, 0.82); }
+.label-select::before {
+    content: "";
+    display: block;
+    width: 42%;
+    height: 2px;
+    border-radius: 999px;
+    background: rgba(29, 54, 74, 0.86);
+    box-shadow: 0 1px rgba(255, 255, 255, 0.28);
+}
+.label-up     { left: 64.3%; top: 55.0%; width: 12.0%; height: 1.8%; transform: rotate(-19deg); font-size: clamp(8px, 1.05vh, 11px); }
+.label-down     { left: 59.0%; top: 57.6%; width: 12.0%; height: 1.8%; transform: rotate(-19deg); font-size: clamp(8px, 1.05vh, 11px); }
+
+/* Printed keypad labels: individually centred to the button artwork instead of using a perfect grid. */
+.label-1 { left: 21.0%; top: 64.55%; width: 13.5%; height: 3.2%; transform: rotate(10deg); }
+.label-2 { left: 41.5%; top: 65.55%; width: 15.6%; height: 3.2%; }
+.label-3 { left: 61.9%; top: 64.55%; width: 13.5%; height: 3.2%; transform: rotate(-10deg); }
+
+.label-4 { left: 22.0%; top: 70.75%; width: 13.5%; height: 3.2%; transform: rotate(10deg); }
+.label-5 { left: 41.2%; top: 71.75%; width: 15.6%; height: 3.2%; }
+.label-6 { left: 61.7%; top: 70.75%; width: 13.5%; height: 3.2%; transform: rotate(-10deg); }
+
+.label-7 { left: 21.8%; top: 76.95%; width: 13.5%; height: 3.2%; transform: rotate(10deg); }
+.label-8 { left: 41.6%; top: 78.05%; width: 15.6%; height: 3.2%; }
+.label-9 { left: 61.4%; top: 76.95%; width: 13.5%; height: 3.2%; transform: rotate(-10deg); }
+
+.label-star { left: 22.8%; top: 84.0%; width: 13.5%; height: 3.2%; transform: rotate(10deg); }
+.label-0 { left: 41.0%; top: 85.0%; width: 15.6%; height: 3.2%; }
+.label-hash { left: 60.9%; top: 84.0%; width: 13.5%; height: 3.2%; transform: rotate(-10deg); }
+
+button.hit {
+    z-index: 3;
+}
+
+/* LCD menu roomier: no baked home title, scrolling window, old LCD selection bar. */
+.view {
+    padding: 2px 1px;
+}
+
+.title:empty {
+    display: none;
+}
+
+.menu-list {
+    position: relative;
+    height: 100%;
+    padding-right: 6px;
+}
+
+.menu-item {
+    height: clamp(15px, 2.28vh, 22px);
+    line-height: clamp(15px, 2.28vh, 22px);
+    font-size: clamp(9px, 1.34vh, 13px);
+}
+
+.menu-index {
+    display: inline-block;
+    width: 13px;
+    opacity: .82;
+}
+
+.scroll-track {
+    position: absolute;
+    right: 1px;
+    top: 2px;
+    bottom: 2px;
+    width: 3px;
+    border-left: 1px solid rgba(29, 43, 22, 0.35);
+}
+
+.scroll-thumb {
+    position: absolute;
+    right: -1px;
+    width: 3px;
+    min-height: 10px;
+    background: var(--lcd-dark);
+}
+
+.status {
+    min-height: 12px;
+    height: 13%;
+    font-size: clamp(7px, 0.98vh, 10px);
+}
+
+.softbar {
+    min-height: 12px;
+    height: 13%;
+    font-size: clamp(7px, 0.94vh, 10px);
+}
+
+.menu-item {
+    height: clamp(11px, 1.62vh, 16px);
+    line-height: clamp(11px, 1.62vh, 16px);
+    font-size: clamp(8px, 1.1vh, 11px);
+}
+
+.title {
+    margin: 0 0 2px;
+    padding-bottom: 1px;
+    font-size: clamp(8px, 1.05vh, 11px);
+}
+.snake-title {
+    margin-bottom: 2px;
+}
+
+.snake-stats {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: clamp(8px, 1vh, 10px);
+    margin-bottom: 3px;
+}
+
+.snake-grid {
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    gap: 1px;
+    width: 100%;
+    aspect-ratio: 10 / 8;
+    padding: 1px;
+    border: 1px solid rgba(27,38,22,.65);
+    background: rgba(70, 92, 48, 0.18);
+    margin-bottom: 4px;
+}
+
+.snake-cell {
+    background: rgba(38, 54, 24, 0.08);
+    border: 1px solid rgba(27,38,22,.08);
+}
+
+.snake-cell.snake {
+    background: rgba(33, 58, 17, 0.75);
+}
+
+.snake-cell.snake.head {
+    background: rgba(20, 35, 10, 0.95);
+}
+
+.snake-cell.food {
+    background: rgba(27,38,22,.45);
+    box-shadow: inset 0 0 0 1px rgba(27,38,22,.2);
+}
+
+.snake-help {
+    font-size: clamp(7px, 0.92vh, 9px);
+    text-align: center;
+    line-height: 1.15;
+    margin-top: 1px;
+}
+
+.snake-score-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: calc(100% - 16px);
+    text-align: center;
+    gap: 4px;
+}
+
+.snake-score-label {
+    font-size: clamp(9px, 1.15vh, 11px);
+}
+
+.snake-score-value {
+    font-size: clamp(20px, 3vh, 28px);
+    line-height: 1;
+}
+
+
+/* Old-school Nokia Snake pass: chunkier LCD pixels, less modern grid, wrap-around playfield. */
+.snake-grid {
+    gap: 0;
+    padding: 2px;
+    border: 2px solid rgba(20, 35, 10, 0.9);
+    background:
+        linear-gradient(rgba(20,35,10,.10) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(20,35,10,.10) 1px, transparent 1px),
+        rgba(132, 159, 94, 0.18);
+    background-size: 10% 12.5%, 10% 12.5%, auto;
+    box-shadow: inset 0 0 0 1px rgba(179, 202, 133, 0.18);
+}
+
+.snake-cell {
+    border: 0;
+    background: transparent;
+    min-width: 0;
+    min-height: 0;
+}
+
+.snake-cell.snake,
+.snake-cell.snake.head,
+.snake-cell.food {
+    background: rgba(20, 35, 10, 0.96);
+    box-shadow:
+        inset 1px 1px 0 rgba(78, 98, 48, 0.35),
+        inset -1px -1px 0 rgba(8, 18, 5, 0.55);
+}
+
+.snake-cell.food {
+    transform: scale(0.72);
+}
+
+.snake-stats {
+    border-top: 1px solid rgba(20,35,10,.55);
+    border-bottom: 1px solid rgba(20,35,10,.55);
+    padding: 2px 0;
+    margin-bottom: 4px;
+}
+
+.snake-help {
+    color: rgba(20, 35, 10, 0.9);
+}
+
+/* Snake mechanics/visual polish: keep all catch blocks clipped inside the LCD game box. */
+.snake-grid {
+    grid-template-columns: repeat(10, minmax(0, 1fr));
+    grid-template-rows: repeat(8, minmax(0, 1fr));
+    overflow: hidden;
+    contain: strict;
+    box-sizing: border-box;
+    gap: 0;
+    padding: 2px;
+}
+
+.snake-cell {
+    position: relative;
+    overflow: hidden;
+    transform: none;
+}
+
+.snake-cell.food {
+    background: transparent;
+    box-shadow: none;
+    transform: none;
+}
+
+.snake-cell.food::before {
+    content: "";
+    position: absolute;
+    inset: 24%;
+    background: rgba(20, 35, 10, 0.96);
+    box-shadow:
+        inset 1px 1px 0 rgba(78, 98, 48, 0.35),
+        inset -1px -1px 0 rgba(8, 18, 5, 0.55);
+}
+
+.snake-cell.snake.food::before {
+    display: none;
+}
+
+.snake-cell.snake,
+.snake-cell.snake.head {
+    transform: none;
+}
+
+.snake-stats span {
+    white-space: nowrap;
+}
+
+
+/* Snake v4: remove LCD grid background and use title space for a taller clean playfield. */
+.snake-title {
+    display: none;
+}
+
+.snake-grid {
+    grid-template-columns: repeat(10, 1fr);
+    grid-auto-rows: 1fr;
+    aspect-ratio: 10 / 9;
+    overflow: hidden;
+    gap: 0;
+    padding: 2px;
+    border: 2px solid rgba(20, 35, 10, 0.95);
+    background: rgba(132, 159, 94, 0.08);
+    background-image: none;
+    margin-bottom: 3px;
+    box-sizing: border-box;
+}
+
+.snake-cell {
+    background: transparent;
+    border: 0;
+    box-sizing: border-box;
+}
+
+.snake-cell.snake,
+.snake-cell.snake.head,
+.snake-cell.food {
+    background: rgba(20, 35, 10, 0.96);
+    box-shadow: none;
+}
+
+.snake-cell.food {
+    transform: scale(0.72);
+    transform-origin: center;
+}
+
+.snake-stats {
+    margin: 0 0 3px;
+    padding: 1px 0 2px;
+    line-height: 1;
+}
+
+.snake-help {
+    line-height: 1;
+    margin-top: 1px;
+}
+
+
+/* Snake v6: lock the real playfield to the visible area only. */
+.snake-grid {
+    grid-template-columns: repeat(10, minmax(0, 1fr));
+    grid-template-rows: repeat(8, minmax(0, 1fr));
+    grid-auto-rows: 0;
+    aspect-ratio: 10 / 8;
+    max-height: calc(100% - 28px);
+    overflow: hidden;
+    contain: layout paint;
+    align-content: stretch;
+    justify-content: stretch;
+}
+
+.snake-grid .snake-cell:nth-child(n+81) {
+    display: none;
+}
+
+.snake-cell {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+.snake-cell.snake,
+.snake-cell.snake.head,
+.snake-cell.food {
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+}
+
+
+/* Snake v7: remove keypad/instruction text from the LCD. */
+.snake-grid {
+    margin-bottom: 2px;
+}
+
+
+/* Snake v8: keep top score screen clean and simple. */
+.snake-score-card {
+    gap: 6px;
+}
+
+
+/* Menu list fit pass: keep titled menus neat with five visible entries. */
+.menu-list {
+    gap: 1px;
+}
+
+.menu-item {
+    min-height: clamp(10px, 1.42vh, 14px);
+    line-height: clamp(10px, 1.42vh, 14px);
+    padding-top: 0;
+    padding-bottom: 0;
+    white-space: nowrap;
+}
+
+.title {
+    margin-bottom: 1px;
+}
+
+
+/* Menu list fit pass v2: show more rows where the LCD has room. */
+.menu-list {
+    gap: 0;
+}
+
+.menu-item {
+    min-height: clamp(8px, 1.12vh, 11px);
+    line-height: clamp(8px, 1.12vh, 11px);
+    padding: 0 2px;
+    font-size: clamp(7px, 0.95vh, 10px);
+}
+
+.menu-index {
+    min-width: 9px;
+}
+
+.title {
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+
+/* Menu list fit pass v3: six rows, normal readable text size restored. */
+.menu-list {
+    gap: 1px;
+}
+
+.menu-item {
+    min-height: clamp(10px, 1.42vh, 14px);
+    line-height: clamp(10px, 1.42vh, 14px);
+    padding: 0 2px;
+    font-size: clamp(8px, 1.1vh, 11px);
+}
+
+.menu-index {
+    min-width: 10px;
+}
+
+.title {
+    margin-bottom: 1px;
+    padding-bottom: 1px;
+}
+
+
+/* Text size pass: +2px overall, layout unchanged. */
+.status {
+    font-size: clamp(9px, 1.1vh, 12px);
+}
+
+.title {
+    font-size: clamp(10px, 1.05vh, 13px);
+}
+
+.menu-item {
+    font-size: clamp(10px, 1.1vh, 13px);
+}
+
+.menu-index {
+    font-size: inherit;
+}
+
+.small,
+.snake-help {
+    font-size: clamp(9px, 0.92vh, 11px);
+}
+
+.input {
+    font-size: clamp(12px, 1.6vh, 16px);
+}
+
+.softbar {
+    font-size: clamp(9px, 1.05vh, 12px);
+}
+
+.bubble {
+    font-size: clamp(10px, 1.05vh, 13px);
+}
+
+.snake-stats {
+    font-size: clamp(10px, 1vh, 12px);
+}
+
+.snake-score-label {
+    font-size: clamp(11px, 1.15vh, 13px);
+}
+
+.snake-score-value {
+    font-size: clamp(22px, 3vh, 30px);
+}
+
+
+/* Messages + softbar clean-up pass. */
+#soft-mid {
+    display: none;
+}
+
+.softbar {
+    grid-template-columns: 1fr 1fr;
+}
+
+#soft-left {
+    text-align: left;
+}
+
+#soft-right {
+    text-align: right;
+}
+
+.message-list {
+    gap: 2px;
+}
+
+.message-entry {
+    margin: 2px 0;
+}
+
+.message-sender {
+    font-size: clamp(7px, 0.9vh, 9px);
+    line-height: 1;
+    opacity: 0.9;
+    margin-bottom: 1px;
+}
+
+.message-entry.out .message-sender {
+    text-align: right;
+}
+
+.message-entry.in .message-sender {
+    text-align: left;
+}
+
+.bubble {
+    margin: 0;
+}
+
+
+/* Softbar role fix: back/cancel/exit on left, select/OK/action on right, no middle label. */
+.softbar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+#soft-left {
+    grid-column: 1;
+    justify-self: start;
+    text-align: left;
+    transform: none;
+}
+
+#soft-mid {
+    display: none;
+    visibility: hidden;
+}
+
+#soft-right {
+    grid-column: 2;
+    justify-self: end;
+    text-align: right;
+    transform: none;
+}
+
+
+/* SMS conversation scroll pass. */
+.message-list {
+    max-height: calc(100% - 16px);
+    overflow: hidden;
+}
+
+.message-entry {
+    margin: 1px 0 2px;
+}
+
+.message-sender {
+    font-size: clamp(7px, 0.82vh, 9px);
+}
+
+.bubble {
+    line-height: 1.05;
+    max-width: 100%;
+    word-break: break-word;
+}
+
+.message-scroll-hint {
+    font-size: clamp(7px, 0.82vh, 9px);
+    line-height: 1;
+    text-align: center;
+    margin-top: 1px;
+}
+
+
+/* SMS proper scroll pass: the list itself scrolls, up/down rocker controls it. */
+.message-list {
+    height: calc(100% - 16px);
+    max-height: calc(100% - 16px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 1px;
+    scrollbar-width: none;
+}
+
+.message-list::-webkit-scrollbar {
+    display: none;
+}
+
+.message-entry {
+    margin: 1px 0 3px;
+}
+
+.message-sender {
+    font-size: clamp(7px, 0.82vh, 9px);
+    line-height: 1;
+    margin-bottom: 1px;
+}
+
+.bubble {
+    line-height: 1.05;
+    max-width: 100%;
+    word-break: break-word;
+}
+
+.message-scroll-hint {
+    display: none;
+}
+
+
+/* SMS visual cleanup: cleaner old-phone thread, no heavy boxes. */
+.message-list {
+    height: calc(100% - 16px);
+    max-height: calc(100% - 16px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 1px 1px 2px;
+    scrollbar-width: none;
+}
+
+.message-entry {
+    margin: 2px 0 4px;
+    clear: both;
+}
+
+.message-sender {
+    font-size: clamp(6px, 0.72vh, 8px);
+    line-height: 1;
+    opacity: 0.75;
+    margin: 0 1px 1px;
+    text-transform: none;
+}
+
+.message-entry.out .message-sender {
+    text-align: right;
+}
+
+.message-entry.in .message-sender {
+    text-align: left;
+}
+
+.bubble {
+    display: inline-block;
+    max-width: 88%;
+    margin: 0;
+    padding: 1px 3px;
+    border: 0;
+    border-top: 1px solid rgba(20, 35, 10, 0.42);
+    border-bottom: 1px solid rgba(20, 35, 10, 0.22);
+    background: transparent;
+    line-height: 1.08;
+    word-break: break-word;
+}
+
+.message-entry.out {
+    text-align: right;
+}
+
+.message-entry.in {
+    text-align: left;
+}
+
+.bubble.out {
+    text-align: right;
+}
+
+.bubble.in {
+    text-align: left;
+}
+
+.message-entry.out .bubble {
+    border-right: 2px solid rgba(20, 35, 10, 0.75);
+    padding-right: 4px;
+}
+
+.message-entry.in .bubble {
+    border-left: 2px solid rgba(20, 35, 10, 0.75);
+    padding-left: 4px;
+}
