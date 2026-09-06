@@ -261,6 +261,7 @@ const mainMenu = [
     { label: 'Messages', action: async () => { await ensureContactsLoaded(); await loadThreads(); push('threads'); } },
     { label: 'Dial Number', action: () => startInput('dial', 'Dial Number') },
     { label: 'My Number', action: () => push('myNumber') },
+    { label: 'Settings', action: () => push('settings') },
     { label: 'Snake', action: async () => { await openSnakeMenu(); } }
 ];
 
@@ -282,15 +283,16 @@ async function loadMessages(number, keepScroll = false) {
     }
 }
 
-function getContactDisplayName(number) {
+function getSavedContactName(number) {
     const digits = String(number ?? '').replace(/\D/g, '');
+    if (!digits) return '';
+
     const contact = contacts.find(c => String(c.phone_number ?? '').replace(/\D/g, '') === digits);
+    return contact?.name || '';
+}
 
-    if (contact && contact.name) {
-        return contact.name;
-    }
-
-    return formatPhoneNumber(number);
+function getContactDisplayName(number) {
+    return getSavedContactName(number) || formatPhoneNumber(number);
 }
 
 async function ensureContactsLoaded() {
@@ -587,6 +589,22 @@ function renderMyNumber() {
     setSoft('OK', 'Back', '');
 }
 
+function renderSettings() {
+    const privateMode = phoneData.callerIdPrivate === true;
+    menu('Settings', [
+        {
+            label: `Caller ID: ${privateMode ? 'Private' : 'Shown'}`,
+            action: async () => {
+                const result = await post('setCallerIdPrivate', { enabled: !privateMode });
+                if (result?.success) {
+                    phoneData.callerIdPrivate = result.callerIdPrivate === true;
+                }
+                render();
+            }
+        }
+    ]);
+}
+
 function renderSnakeMenu() {
     menu('Snake', [
         { label: 'New Game', action: () => { push('snakeGame'); newSnakeGame(); } },
@@ -666,10 +684,11 @@ function renderInput() {
 function renderCall() {
     const status = activeCall?.status || 'Calling';
     const number = activeCall?.number || '';
+    const displayNumber = activeCall?.private ? 'PRIVATE NUMBER' : formatPhoneNumber(number);
     view.innerHTML = `
         <div class="title">${escapeHtml(status)}</div>
         <div class="big-icon">☎</div>
-        <div class="center">${escapeHtml(formatPhoneNumber(number))}</div>
+        <div class="center">${escapeHtml(displayNumber)}</div>
         <div class="center small">${escapeHtml(activeCall?.hint || '')}</div>
     `;
     setSoft(activeCall?.incoming ? 'Answer' : 'End', activeCall?.incoming ? 'Reject' : 'Back', '');
@@ -691,6 +710,7 @@ function render() {
     if (screen === 'threads') return renderThreads();
     if (screen === 'conversation') return renderConversation();
     if (screen === 'myNumber') return renderMyNumber();
+    if (screen === 'settings') return renderSettings();
     if (screen === 'snakeMenu') return renderSnakeMenu();
     if (screen === 'snakeTopScore') return renderSnakeTopScore();
     if (screen === 'snakeGame') return renderSnakeGame();
@@ -708,6 +728,21 @@ function currentItems() {
                     push('contactActions');
                 }
             }))
+        ];
+    }
+    if (screen === 'settings') {
+        const privateMode = phoneData.callerIdPrivate === true;
+        return [
+            {
+                label: `Caller ID: ${privateMode ? 'Private' : 'Shown'}`,
+                action: async () => {
+                    const result = await post('setCallerIdPrivate', { enabled: !privateMode });
+                    if (result?.success) {
+                        phoneData.callerIdPrivate = result.callerIdPrivate === true;
+                    }
+                    render();
+                }
+            }
         ];
     }
     if (screen === 'contactActions') {
@@ -1123,13 +1158,23 @@ window.addEventListener('message', async event => {
 
     if (action === 'incomingCall') {
         startRingtone();
+
+        const isPrivate = data?.private === true;
+        let savedName = '';
+
+        if (!isPrivate && data?.number) {
+            await ensureContactsLoaded();
+            savedName = getSavedContactName(data.number);
+        }
+
         activeCall = {
             callId: data.callId,
-            number: data.number,
+            number: isPrivate ? '' : data.number,
+            private: isPrivate,
             status: 'Incoming',
             incoming: true,
             force: true,
-            hint: data.name || ''
+            hint: savedName
         };
         screen = 'call';
         render();
@@ -1150,13 +1195,24 @@ window.addEventListener('message', async event => {
 
     if (action === 'callStarted') {
         stopRingtone();
+
+        const isPrivate = data?.private === true;
+        let hint = 'Connected';
+
+        if (!isPrivate && data?.number) {
+            await ensureContactsLoaded();
+            const savedName = getSavedContactName(data.number);
+            if (savedName) hint = savedName;
+        }
+
         activeCall = {
             callId: data.callId,
-            number: data.number,
+            number: isPrivate ? '' : data.number,
+            private: isPrivate,
             status: 'In Call',
             incoming: false,
             force: true,
-            hint: 'Connected'
+            hint
         };
         screen = 'call';
         render();

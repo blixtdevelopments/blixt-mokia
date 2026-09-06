@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS `blixt_mokia_numbers` (
   `citizenid` varchar(64) NOT NULL,
   `phone_number` varchar(20) NOT NULL,
   `display_name` varchar(64) DEFAULT NULL,
+  `caller_id_private` tinyint(1) NOT NULL DEFAULT 0,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `citizenid` (`citizenid`),

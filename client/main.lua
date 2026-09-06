@@ -217,7 +217,7 @@ if Config.Debug then
         end
 
         local callId = ('testcall:%s:%s'):format(GetPlayerServerId(PlayerId()), GetGameTimer())
-        local number = (Config.TestCall and Config.TestCall.Number) or '0400002001'
+        local number = (Config.TestCall and Config.TestCall.Number) or '2135552001'
         local name = (Config.TestCall and Config.TestCall.Name) or 'Test Caller'
 
         testCall = {
@@ -273,6 +273,11 @@ RegisterNUICallback('setTypingState', function(data, cb)
     end
 
     cb({ ok = true })
+end)
+
+RegisterNUICallback('setCallerIdPrivate', function(data, cb)
+    local result = Bridge.CallbackAwait('blixt-mokia:server:setCallerIdPrivate', data and data.enabled == true)
+    cb(result or { success = false })
 end)
 
 RegisterNUICallback('getContacts', function(_, cb)

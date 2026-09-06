@@ -3,7 +3,7 @@ Config = {}
 Config.Debug = false
 
 -- Framework support: 'auto', 'qb', 'qbx', or 'standalone'.
-Config.Framework = 'auto'
+Config.Framework = 'qbx'
 
 -- Item(s) that open the phone. Keep this as 'phone' if replacing qbx_npwd/npwd.
 Config.PhoneItems = {
@@ -35,6 +35,11 @@ Config.NumberAreaCodes = {
 Config.NumberExchange = '555'
 Config.NumberLength = 10
 
+-- Automatically convert old 04xxxxxxxx numbers from earlier builds to US numbers.
+-- Existing contacts, messages and call history are updated at the same time.
+Config.AutoMigrateLegacyNumbers = true
+Config.LegacyNumberPrefix = '04'
+
 -- Call channel range used for pma-voice.
 Config.CallChannelMin = 700000
 Config.CallChannelMax = 799999
@@ -61,7 +66,7 @@ Config.AllowMovementWhileOpen = true
 -- Debug-only test call command. Only registered when Config.Debug = true.
 Config.TestCall = {
     Command = 'testcall',
-    Number = '0400002001',
+    Number = '2135552001',
     Name = 'Test Caller',
     RingSeconds = 12,
     ConnectedSeconds = 4

@@ -16,6 +16,7 @@ local function ensureDatabase()
           `citizenid` varchar(64) NOT NULL,
           `phone_number` varchar(20) NOT NULL,
           `display_name` varchar(64) DEFAULT NULL,
+          `caller_id_private` tinyint(1) NOT NULL DEFAULT 0,
           `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
           PRIMARY KEY (`id`),
           UNIQUE KEY `citizenid` (`citizenid`),
@@ -74,6 +75,19 @@ local function ensureDatabase()
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     ]])
 
+    local callerIdColumn = MySQL.single.await([[
+        SELECT COLUMN_NAME
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'blixt_mokia_numbers'
+          AND COLUMN_NAME = 'caller_id_private'
+        LIMIT 1
+    ]])
+
+    if not callerIdColumn then
+        MySQL.query.await('ALTER TABLE `blixt_mokia_numbers` ADD COLUMN `caller_id_private` tinyint(1) NOT NULL DEFAULT 0 AFTER `display_name`')
+    end
+
     debugPrint('Database tables checked/created.')
 end
 
@@ -93,9 +107,13 @@ local function normalizeNumber(number)
 end
 
 local function generateNumber()
-    if Config.NumberFormat == 'us_1999' then
+    local numberFormat = tostring(Config.NumberFormat or '')
+
+    -- Keep both names for backwards compatibility. Older configs used us_213 even
+    -- though the generator originally only checked for us_1999.
+    if numberFormat == 'us_1999' or numberFormat == 'us_213' or numberFormat:sub(1, 3) == 'us_' then
         local areaCodes = Config.NumberAreaCodes or { '213', '310', '323', '415', '510', '702', '718', '917' }
-        local areaCode = areaCodes[math.random(1, #areaCodes)]
+        local areaCode = tostring(areaCodes[math.random(1, #areaCodes)])
         local exchange = tostring(Config.NumberExchange or '555')
         local lineNumber = tostring(math.random(0, 9999)):format('%04d')
 
@@ -111,6 +129,55 @@ local function generateNumber()
     end
 
     return prefix .. suffix
+end
+
+local function generateUniqueNumber()
+    local number
+
+    repeat
+        number = generateNumber()
+        local taken = MySQL.scalar.await('SELECT 1 FROM blixt_mokia_numbers WHERE phone_number = ? LIMIT 1', { number })
+    until not taken
+
+    return number
+end
+
+local function isLegacyAustralianNumber(number)
+    number = normalizeNumber(number)
+    return #number == 10 and number:sub(1, 2) == tostring(Config.LegacyNumberPrefix or '04')
+end
+
+local function migrateLegacyNumbers()
+    if Config.AutoMigrateLegacyNumbers == false then return end
+
+    local rows = MySQL.query.await('SELECT citizenid, phone_number FROM blixt_mokia_numbers') or {}
+    local migrated = 0
+
+    for _, row in ipairs(rows) do
+        local oldNumber = normalizeNumber(row.phone_number)
+
+        if isLegacyAustralianNumber(oldNumber) then
+            local newNumber = generateUniqueNumber()
+
+            -- Update every stored reference so contacts, texts and call records continue
+            -- to point at the same character after their number is converted.
+            MySQL.update.await('UPDATE blixt_mokia_contacts SET phone_number = ? WHERE phone_number = ?', { newNumber, oldNumber })
+            MySQL.update.await('UPDATE blixt_mokia_messages SET sender_number = ? WHERE sender_number = ?', { newNumber, oldNumber })
+            MySQL.update.await('UPDATE blixt_mokia_messages SET receiver_number = ? WHERE receiver_number = ?', { newNumber, oldNumber })
+            MySQL.update.await('UPDATE blixt_mokia_call_history SET owner_number = ? WHERE owner_number = ?', { newNumber, oldNumber })
+            MySQL.update.await('UPDATE blixt_mokia_call_history SET other_number = ? WHERE other_number = ?', { newNumber, oldNumber })
+            MySQL.update.await('UPDATE blixt_mokia_numbers SET phone_number = ? WHERE citizenid = ?', { newNumber, row.citizenid })
+
+            migrated = migrated + 1
+            print(('[blixt-mokia] Migrated legacy number %s -> %s (%s)'):format(oldNumber, newNumber, row.citizenid))
+        end
+    end
+
+    if migrated > 0 then
+        print(('[blixt-mokia] Automatically migrated %s legacy Australian phone number(s) to US format.'):format(migrated))
+    else
+        debugPrint('No legacy Australian phone numbers needed migration.')
+    end
 end
 
 local function getSourceByCitizenId(citizenid)
@@ -144,13 +211,9 @@ local function ensurePlayerNumber(source)
         return existing.phone_number
     end
 
-    local number
-    repeat
-        number = generateNumber()
-        local taken = MySQL.scalar.await('SELECT 1 FROM blixt_mokia_numbers WHERE phone_number = ? LIMIT 1', { number })
-    until not taken
+    local number = generateUniqueNumber()
 
-    MySQL.insert.await('INSERT INTO blixt_mokia_numbers (citizenid, phone_number, display_name) VALUES (?, ?, ?)', {
+    MySQL.insert.await('INSERT INTO blixt_mokia_numbers (citizenid, phone_number, display_name, caller_id_private) VALUES (?, ?, ?, 0)', {
         citizenid,
         number,
         Bridge.GetCharacterName(source)
@@ -162,11 +225,33 @@ end
 
 local function getBasicData(source)
     local number = ensurePlayerNumber(source)
+    local citizenid = Bridge.GetCitizenId(source)
+    local callerIdPrivate = false
+
+    if citizenid then
+        callerIdPrivate = (tonumber(MySQL.scalar.await('SELECT caller_id_private FROM blixt_mokia_numbers WHERE citizenid = ? LIMIT 1', { citizenid })) or 0) == 1
+    end
 
     return {
         number = number,
-        name = Bridge.GetCharacterName(source)
+        name = Bridge.GetCharacterName(source),
+        callerIdPrivate = callerIdPrivate
     }
+end
+
+local function getCallerIdPrivate(source)
+    local citizenid = Bridge.GetCitizenId(source)
+    if not citizenid then return false end
+
+    return (tonumber(MySQL.scalar.await('SELECT caller_id_private FROM blixt_mokia_numbers WHERE citizenid = ? LIMIT 1', { citizenid })) or 0) == 1
+end
+
+local function historyCallerNumber(call)
+    if call.callerIdPrivate then
+        return 'PRIVATE'
+    end
+
+    return call.callerNumber
 end
 
 local function endCall(callId, endedBy)
@@ -201,7 +286,7 @@ local function endCall(callId, endedBy)
 
     MySQL.insert('INSERT INTO blixt_mokia_call_history (owner_number, other_number, direction, status, duration) VALUES (?, ?, ?, ?, ?)', {
         call.targetNumber,
-        call.callerNumber,
+        historyCallerNumber(call),
         'incoming',
         call.startedAt and 'answered' or 'ended',
         duration
@@ -229,6 +314,11 @@ CreateThread(function()
     if not ok then
         print(('[blixt-mokia] Failed to auto-create database tables: %s'):format(err))
         print('[blixt-mokia] Check oxmysql is started before blixt-mokia and your database connection is working.')
+    else
+        local migratedOk, migratedErr = pcall(migrateLegacyNumbers)
+        if not migratedOk then
+            print(('[blixt-mokia] Legacy phone-number migration failed: %s'):format(migratedErr))
+        end
     end
 
     Bridge.RegisterPhoneItems()
@@ -236,6 +326,21 @@ end)
 
 Bridge.RegisterCallback('blixt-mokia:server:getPhoneData', function(source)
     return getBasicData(source)
+end)
+
+Bridge.RegisterCallback('blixt-mokia:server:setCallerIdPrivate', function(source, enabled)
+    local citizenid = Bridge.GetCitizenId(source)
+    if not citizenid then return { success = false, message = 'No character loaded.' } end
+
+    ensurePlayerNumber(source)
+    local private = enabled == true
+
+    MySQL.update.await('UPDATE blixt_mokia_numbers SET caller_id_private = ? WHERE citizenid = ?', {
+        private and 1 or 0,
+        citizenid
+    })
+
+    return { success = true, callerIdPrivate = private }
 end)
 
 Bridge.RegisterCallback('blixt-mokia:server:getContacts', function(source)
@@ -445,12 +550,15 @@ Bridge.RegisterCallback('blixt-mokia:server:startCall', function(source, rawNumb
     local callId = ('%s:%s:%s'):format(source, targetSource, os.time())
     local channel = math.random(Config.CallChannelMin, Config.CallChannelMax)
 
+    local callerIdPrivate = getCallerIdPrivate(source)
+
     ActiveCalls[callId] = {
         id = callId,
         caller = source,
         target = targetSource,
         callerNumber = callerNumber,
         targetNumber = targetNumber,
+        callerIdPrivate = callerIdPrivate,
         channel = channel,
         createdAt = os.time()
     }
@@ -464,8 +572,8 @@ Bridge.RegisterCallback('blixt-mokia:server:startCall', function(source, rawNumb
 
     TriggerClientEvent('blixt-mokia:client:incomingCall', targetSource, {
         callId = callId,
-        number = callerNumber,
-        name = Bridge.GetCharacterName(source)
+        number = callerIdPrivate and nil or callerNumber,
+        private = callerIdPrivate
     })
 
     SetTimeout(Config.RingTimeout * 1000, function()
@@ -481,7 +589,7 @@ Bridge.RegisterCallback('blixt-mokia:server:startCall', function(source, rawNumb
                 callerNumber, targetNumber, 'outgoing', 'missed', 0
             })
             MySQL.insert('INSERT INTO blixt_mokia_call_history (owner_number, other_number, direction, status, duration) VALUES (?, ?, ?, ?, ?)', {
-                targetNumber, callerNumber, 'incoming', 'missed', 0
+                targetNumber, callerIdPrivate and 'PRIVATE' or callerNumber, 'incoming', 'missed', 0
             })
         end
     end)
@@ -507,7 +615,8 @@ RegisterNetEvent('blixt-mokia:server:answerCall', function(callId)
 
     TriggerClientEvent('blixt-mokia:client:callStarted', call.target, {
         callId = callId,
-        number = call.callerNumber
+        number = call.callerIdPrivate and nil or call.callerNumber,
+        private = call.callerIdPrivate
     })
 end)
 
@@ -526,7 +635,7 @@ RegisterNetEvent('blixt-mokia:server:declineCall', function(callId)
         call.callerNumber, call.targetNumber, 'outgoing', 'rejected', 0
     })
     MySQL.insert('INSERT INTO blixt_mokia_call_history (owner_number, other_number, direction, status, duration) VALUES (?, ?, ?, ?, ?)', {
-        call.targetNumber, call.callerNumber, 'incoming', 'rejected', 0
+        call.targetNumber, historyCallerNumber(call), 'incoming', 'rejected', 0
     })
 end)
 
