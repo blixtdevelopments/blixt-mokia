@@ -19,6 +19,16 @@ Config.OpenCommand = 'mokia'
 -- This enables an ox_inventory item hook fallback so using the item opens the phone.
 Config.UseOxInventoryHooks = false
 
+-- Optional txAdmin SMS announcements.
+-- To enable:
+-- 1. Set this to true.
+-- 2. In txAdmin > Settings > Game > Notifications, enable "Hide Default Announcement".
+-- 3. Restart the server.
+-- Players with a phone item get an SMS from Announcement; players without one
+-- still see the original txAdmin popup. Restart warnings are never sent as SMS.
+-- If you turn this off later, disable "Hide Default Announcement" in txAdmin too.
+Config.TxAdminAnnouncements = true
+
 
 -- Script will randomly generate area codes so every number is different
 Config.NumberFormat = 'us_1999'

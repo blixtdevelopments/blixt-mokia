@@ -26,6 +26,8 @@ let snakeBest = 0;
 let snakeLoop = null;
 let snakeGame = null;
 
+const ANNOUNCEMENT = 'ANNOUNCEMENT';
+
 const resource = typeof GetParentResourceName === 'function' ? GetParentResourceName() : 'blixt-mokia';
 
 const ringtone = new Audio("./assets/ringtone.mp3");
@@ -174,6 +176,25 @@ function updateClock() {
 setInterval(updateClock, 1000);
 updateClock();
 
+function formatMessageTime(seconds) {
+    const timestamp = Number(seconds);
+    if (!Number.isFinite(timestamp) || timestamp <= 0) return '';
+
+    const sent = new Date(timestamp * 1000);
+    if (Number.isNaN(sent.getTime())) return '';
+
+    const now = new Date();
+    const time = `${String(sent.getHours()).padStart(2, '0')}:${String(sent.getMinutes()).padStart(2, '0')}`;
+    const isToday = sent.getFullYear() === now.getFullYear()
+        && sent.getMonth() === now.getMonth()
+        && sent.getDate() === now.getDate();
+    const date = isToday
+        ? 'Today'
+        : `${String(sent.getMonth() + 1).padStart(2, '0')}/${String(sent.getDate()).padStart(2, '0')}`;
+
+    return `${date} ${time}`;
+}
+
 function escapeHtml(str) {
     return String(str ?? '').replace(/[&<>"']/g, s => ({
         '&': '&amp;',
@@ -292,6 +313,7 @@ function getSavedContactName(number) {
 }
 
 function getContactDisplayName(number) {
+    if (number === ANNOUNCEMENT) return 'Announcement';
     return getSavedContactName(number) || formatPhoneNumber(number);
 }
 
@@ -514,7 +536,7 @@ function renderThreads() {
     const items = [
         { label: 'New Message', action: () => startInput('smsNumber', 'New Message') },
         ...threads.map(t => ({
-            label: `${formatPhoneNumber(t.other_number)}: ${t.last_message || ''}`,
+            label: `${getContactDisplayName(t.other_number)}: ${t.last_message || ''}`,
             action: async () => { await ensureContactsLoaded(); await loadMessages(t.other_number); push('conversation'); }
         }))
     ];
@@ -556,10 +578,11 @@ function renderConversation() {
 
     messages.forEach(m => {
         const out = m.sender_number === phoneData.number;
-        const senderLabel = out ? 'Me' : getContactDisplayName(m.sender_number);
+        const senderLabel = activeNumber === ANNOUNCEMENT ? '' : (out ? 'Me' : getContactDisplayName(m.sender_number));
+        const sentTime = formatMessageTime(m.sent_at);
         html += `
             <div class="message-entry ${out ? 'out' : 'in'}">
-                <div class="message-sender">${escapeHtml(senderLabel)}</div>
+                <div class="message-sender">${senderLabel ? `<span class="message-name">${escapeHtml(senderLabel)}</span>` : ''}${sentTime ? `<span class="message-time">${sentTime}</span>` : ''}</div>
                 <div class="bubble ${out ? 'out' : 'in'}">${escapeHtml(m.content)}</div>
             </div>
         `;
@@ -567,7 +590,7 @@ function renderConversation() {
 
     html += `</div>`;
     view.innerHTML = html;
-    setSoft('Reply', 'Back');
+    setSoft(activeNumber === ANNOUNCEMENT ? '' : 'Reply', 'Back');
 
     requestAnimationFrame(() => {
         const list = getConversationListElement();
@@ -762,7 +785,7 @@ function currentItems() {
         return [
             { label: 'New Message', action: () => startInput('smsNumber', 'New Message') },
             ...threads.map(t => ({
-                label: `${formatPhoneNumber(t.other_number)}: ${t.last_message || ''}`,
+                label: `${getContactDisplayName(t.other_number)}: ${t.last_message || ''}`,
                 action: async () => { await ensureContactsLoaded(); await loadMessages(t.other_number); push('conversation'); }
             }))
         ];
@@ -783,6 +806,7 @@ async function selectAction() {
     }
 
     if (screen === 'conversation') {
+        if (activeNumber === ANNOUNCEMENT) return;
         inputMode = 'replyMessage';
         inputValue = '';
         inputTitle = 'Reply';
@@ -850,7 +874,7 @@ async function submitInput() {
     }
 
     if (inputMode === 'smsMessage' || inputMode === 'replyMessage') {
-        if (!val) return;
+        if (activeNumber === ANNOUNCEMENT || !val) return;
         inputSubmitting = true;
         await post('sendMessage', { number: activeNumber, message: val });
         inputMode = null;
@@ -1145,8 +1169,11 @@ window.addEventListener('message', async event => {
 
         const fromDigits = String(data?.from ?? '').replace(/\D/g, '');
         const activeDigits = String(activeNumber ?? '').replace(/\D/g, '');
+        const matchingThread = data?.from === ANNOUNCEMENT
+            ? activeNumber === ANNOUNCEMENT
+            : fromDigits !== '' && fromDigits === activeDigits;
 
-        if (!app.classList.contains('hidden') && screen === 'conversation' && fromDigits === activeDigits) {
+        if (!app.classList.contains('hidden') && screen === 'conversation' && matchingThread) {
             const list = getConversationListElement();
             const wasAtBottom = !list || (list.scrollTop + list.clientHeight >= list.scrollHeight - 2);
 

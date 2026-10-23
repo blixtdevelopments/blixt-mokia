@@ -32,6 +32,17 @@ CREATE TABLE IF NOT EXISTS `blixt_mokia_messages` (
   KEY `receiver_sender` (`receiver_number`, `sender_number`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Optional txAdmin SMS announcements. Kept separate from regular messages.
+CREATE TABLE IF NOT EXISTS `blixt_mokia_announcements` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `session_id` varchar(64) NOT NULL,
+  `citizenid` varchar(64) NOT NULL,
+  `content` text NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `session_recipient` (`session_id`, `citizenid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS `blixt_mokia_call_history` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `owner_number` varchar(20) NOT NULL,

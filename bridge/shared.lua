@@ -179,6 +179,38 @@ if IsDuplicityVersion() then
         end
     end
 
+    -- Only a real inventory item counts, not an assigned phone number.
+    function Bridge.HasPhoneItem(source)
+        if not Bridge.GetCitizenId(source) then return false end
+
+        local items = Config.PhoneItems or {}
+        if GetResourceState('ox_inventory') == 'started' then
+            for _, name in ipairs(items) do
+                local ok, count = pcall(function()
+                    return exports.ox_inventory:Search(source, 'count', name)
+                end)
+                if ok and (tonumber(count) or 0) > 0 then return true end
+            end
+        end
+
+        local player = Bridge.GetPlayer(source)
+        local inventory = player and player.PlayerData and player.PlayerData.items
+        if type(inventory) ~= 'table' then return false end
+
+        for _, item in pairs(inventory) do
+            if type(item) == 'table' then
+                for _, name in ipairs(items) do
+                    if (item.name == name or item.item == name)
+                        and (tonumber(item.amount or item.count or item.quantity) or 0) > 0 then
+                        return true
+                    end
+                end
+            end
+        end
+
+        return false
+    end
+
     function Bridge.SetPlayerCall(source, channel)
         exports['pma-voice']:setPlayerCall(source, channel)
     end

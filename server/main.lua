@@ -1,6 +1,14 @@
 local PlayerNumbers = {}
 local ActiveCalls = {}
 local PendingByTarget = {}
+local AnnouncementSender = 'ANNOUNCEMENT'
+local AnnouncementSession
+local AnnouncementsReady = false
+
+local function isDefaultAnnouncementHidden()
+    local setting = tostring(GetConvar('txAdmin-hideDefaultAnnouncement', 'false')):lower()
+    return setting == 'true' or setting == '1'
+end
 
 local function debugPrint(...)
     if Config.Debug then
@@ -74,6 +82,54 @@ local function ensureDatabase()
           UNIQUE KEY `citizenid` (`citizenid`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     ]])
+
+    if Config.TxAdminAnnouncements then
+        MySQL.query.await([[
+            CREATE TABLE IF NOT EXISTS `blixt_mokia_announcements` (
+              `id` int(11) NOT NULL AUTO_INCREMENT,
+              `session_id` varchar(64) NOT NULL,
+              `citizenid` varchar(64) NOT NULL,
+              `content` text NOT NULL,
+              `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+              PRIMARY KEY (`id`),
+              KEY `session_recipient` (`session_id`, `citizenid`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        ]])
+
+        -- Earlier versions created this table without per-character recipients.
+        local recipientColumn = MySQL.single.await([[
+            SELECT COLUMN_NAME
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'blixt_mokia_announcements'
+              AND COLUMN_NAME = 'citizenid'
+            LIMIT 1
+        ]])
+
+        if not recipientColumn then
+            MySQL.query.await([[
+                ALTER TABLE `blixt_mokia_announcements`
+                ADD COLUMN `citizenid` varchar(64) NOT NULL DEFAULT '' AFTER `session_id`
+            ]])
+            print('[blixt-mokia] Updated announcement database schema.')
+        end
+
+        local recipientIndex = MySQL.single.await([[
+            SELECT INDEX_NAME
+            FROM INFORMATION_SCHEMA.STATISTICS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'blixt_mokia_announcements'
+              AND INDEX_NAME = 'session_recipient'
+            LIMIT 1
+        ]])
+
+        if not recipientIndex then
+            MySQL.query.await([[
+                ALTER TABLE `blixt_mokia_announcements`
+                ADD INDEX `session_recipient` (`session_id`, `citizenid`)
+            ]])
+        end
+    end
 
     local callerIdColumn = MySQL.single.await([[
         SELECT COLUMN_NAME
@@ -310,6 +366,16 @@ CreateThread(function()
     Wait(1000)
     math.randomseed(os.time())
 
+    if Config.TxAdminAnnouncements then
+        -- GlobalState survives a resource restart, but resets when FXServer restarts.
+        local session = GlobalState.blixtMokiaAnnouncementSession
+        if not session then
+            session = ('%d_%d_%d'):format(os.time(), GetGameTimer(), math.random(10000, 99999))
+            GlobalState.blixtMokiaAnnouncementSession = session
+        end
+        AnnouncementSession = session
+    end
+
     local ok, err = pcall(ensureDatabase)
     if not ok then
         print(('[blixt-mokia] Failed to auto-create database tables: %s'):format(err))
@@ -321,8 +387,66 @@ CreateThread(function()
         end
     end
 
+    if Config.TxAdminAnnouncements and ok then
+        local cleared, cleanupErr = pcall(function()
+            MySQL.update.await('DELETE FROM blixt_mokia_announcements WHERE session_id <> ?', { AnnouncementSession })
+        end)
+        AnnouncementsReady = cleared
+        if not cleared then
+            print(('[blixt-mokia] txAdmin announcement storage unavailable: %s'):format(cleanupErr))
+        end
+    end
+
+    if Config.TxAdminAnnouncements then
+        print('[blixt-mokia] txAdmin SMS announcements enabled.')
+        if not isDefaultAnnouncementHidden() then
+            print('[blixt-mokia] IMPORTANT: Enable "Hide Default Announcement" in txAdmin > Settings > Game > Notifications. SMS routing is inactive until then.')
+        end
+    end
+
     Bridge.RegisterPhoneItems()
 end)
+
+-- Only manual txAdmin announcements are routed. Scheduled restarts use a different event.
+if Config.TxAdminAnnouncements then
+    AddEventHandler('txAdmin:events:announcement', function(eventData)
+        -- Leave txAdmin in full control if the server owner hasn't hidden its default popup.
+        if not isDefaultAnnouncementHidden() then return end
+        local message = type(eventData) == 'table' and eventData.message or nil
+        if type(message) ~= 'string' or message == '' then return end
+
+        local hideAuthor = tostring(GetConvar('txAdmin-hideAdminInMessages', 'false')):lower()
+        local author = (hideAuthor == 'true' or hideAuthor == '1')
+            and GetConvar('txAdmin-serverName', 'txAdmin')
+            or (eventData.author or 'anonym')
+
+        for _, playerId in ipairs(GetPlayers()) do
+            local target = tonumber(playerId)
+            if target then
+                local citizenid = Bridge.GetCitizenId(target)
+                if AnnouncementsReady and citizenid and Bridge.HasPhoneItem(target) then
+                    local saved, id = pcall(function()
+                        return MySQL.insert.await([[
+                            INSERT INTO blixt_mokia_announcements (session_id, citizenid, content)
+                            VALUES (?, ?, ?)
+                        ]], { AnnouncementSession, citizenid, message })
+                    end)
+                    if saved and tonumber(id) and tonumber(id) > 0 then
+                        TriggerClientEvent('blixt-mokia:client:newMessage', target, {
+                            from = AnnouncementSender,
+                            message = message
+                        })
+                    else
+                        -- Never lose a broadcast if storage is unavailable.
+                        TriggerClientEvent('txcl:showAnnouncement', target, message, author)
+                    end
+                else
+                    TriggerClientEvent('txcl:showAnnouncement', target, message, author)
+                end
+            end
+        end
+    end)
+end
 
 Bridge.RegisterCallback('blixt-mokia:server:getPhoneData', function(source)
     return getBasicData(source)
@@ -448,7 +572,7 @@ Bridge.RegisterCallback('blixt-mokia:server:getThreads', function(source)
                 WHEN sender_number = ? THEN receiver_number
                 ELSE sender_number
             END AS other_number,
-            MAX(created_at) AS last_time
+            UNIX_TIMESTAMP(MAX(created_at)) AS last_time
         FROM blixt_mokia_messages
         WHERE sender_number = ? OR receiver_number = ?
         GROUP BY other_number
@@ -469,11 +593,61 @@ Bridge.RegisterCallback('blixt-mokia:server:getThreads', function(source)
         row.direction = msg and msg.sender_number == myNumber and 'outgoing' or 'incoming'
     end
 
+    if Config.TxAdminAnnouncements and AnnouncementsReady then
+        local citizenid = Bridge.GetCitizenId(source)
+        if citizenid then
+            local latest = MySQL.single.await([[
+                SELECT content, UNIX_TIMESTAMP(created_at) AS last_time
+                FROM blixt_mokia_announcements
+                WHERE session_id = ? AND citizenid = ?
+                ORDER BY id DESC LIMIT 1
+            ]], { AnnouncementSession, citizenid })
+            if latest then
+                rows[#rows + 1] = {
+                    other_number = AnnouncementSender,
+                    last_message = latest.content,
+                    last_time = latest.last_time,
+                    direction = 'incoming'
+                }
+                table.sort(rows, function(a, b)
+                    return (tonumber(a.last_time) or 0) > (tonumber(b.last_time) or 0)
+                end)
+            end
+        end
+    end
+
     return rows
 end)
 
 Bridge.RegisterCallback('blixt-mokia:server:getMessages', function(source, otherNumber)
     local myNumber = ensurePlayerNumber(source)
+    if otherNumber == AnnouncementSender then
+        if not Config.TxAdminAnnouncements or not AnnouncementsReady or not myNumber then return {} end
+        local citizenid = Bridge.GetCitizenId(source)
+        if not citizenid then return {} end
+
+        local items = MySQL.query.await([[
+            SELECT id, content, created_at, UNIX_TIMESTAMP(created_at) AS sent_at
+            FROM blixt_mokia_announcements
+            WHERE session_id = ? AND citizenid = ?
+            ORDER BY id DESC LIMIT 100
+        ]], { AnnouncementSession, citizenid }) or {}
+
+        local results = {}
+        for i = #items, 1, -1 do
+            local item = items[i]
+            results[#results + 1] = {
+                id = item.id,
+                sender_number = AnnouncementSender,
+                receiver_number = myNumber,
+                content = item.content,
+                is_read = 1,
+                created_at = item.created_at,
+                sent_at = item.sent_at
+            }
+        end
+        return results
+    end
     otherNumber = normalizeNumber(otherNumber)
 
     if not myNumber or otherNumber == '' then return {} end
@@ -484,7 +658,8 @@ Bridge.RegisterCallback('blixt-mokia:server:getMessages', function(source, other
     })
 
     return MySQL.query.await([[
-        SELECT id, sender_number, receiver_number, content, is_read, created_at
+        SELECT id, sender_number, receiver_number, content, is_read,
+               created_at, UNIX_TIMESTAMP(created_at) AS sent_at
         FROM blixt_mokia_messages
         WHERE (sender_number = ? AND receiver_number = ?) OR (sender_number = ? AND receiver_number = ?)
         ORDER BY created_at ASC

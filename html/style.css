@@ -923,3 +923,36 @@ button.hit {
     border-left: 2px solid rgba(20, 35, 10, 0.75);
     padding-left: 4px;
 }
+
+/* Compact, readable SMS metadata. */
+.message-sender {
+    display: flex;
+    align-items: baseline;
+    gap: 3px;
+    font-size: clamp(8px, 1vh, 10px);
+    font-weight: 800;
+    color: var(--lcd-dark);
+    opacity: 1;
+}
+
+.message-entry.out .message-sender {
+    justify-content: flex-end;
+}
+
+.message-entry.in .message-sender {
+    justify-content: flex-start;
+}
+
+.message-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.message-time {
+    flex-shrink: 0;
+    font-size: inherit;
+    opacity: 1;
+    white-space: nowrap;
+}
