@@ -27,7 +27,7 @@ Config.UseOxInventoryHooks = false
 -- Players with a phone item get an SMS from Announcement; players without one
 -- still see the original txAdmin popup. Restart warnings are never sent as SMS.
 -- If you turn this off later, disable "Hide Default Announcement" in txAdmin too.
-Config.TxAdminAnnouncements = true
+Config.TxAdminAnnouncements = false
 
 
 -- Script will randomly generate area codes so every number is different
