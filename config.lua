@@ -85,14 +85,15 @@ Config.TestCall = {
 -- Visual phone prop/animation handling. replaced with older phone prop
 Config.PhoneVisuals = {
     Enabled = true,
-    PropModel = 'prop_v_m_phone_o1s',
+    PropModel = 'blixt_mokia_prop',
 
     -- Close to the standard GTA/FiveM cellphone hand placement.
     -- If the Mokia prop sits slightly wrong in-game, tweak these only.
     PropPlacement = {
-        bone = 28422,
-        coords = vec3(0.0, 0.0, 0.0),
-        rot = vec3(0.0, 0.0, 0.0)
+        bone = 57005,
+        coords = vec3(0.1500, 0.0100, -0.0300),  
+        rot = vec3(-155.0000, 240.0000, 55.0000)
+
     },
 
     Animations = {
