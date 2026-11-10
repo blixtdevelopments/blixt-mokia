@@ -4,7 +4,7 @@ game 'gta5'
 name 'blixt-mokia'
 author 'Blixt Developments'
 description 'Custom phone for qbox/qb-core nokia style'
-version '1.0.0'
+version '1.3.0'
 
 lua54 'yes'
 
