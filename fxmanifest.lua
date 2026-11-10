@@ -32,7 +32,7 @@ files {
     'html/app.js',
     'html/assets/phone.png',
     'html/assets/ringtone.mp3',
-    'html/assets/nokiatext.mp3'
+    'html/assets/nokiatext.mp3',
     'stream/blixt_mokia_prop.ytyp' 
 }
 data_file 'DLC_ITYP_REQUEST' 'stream/blixt_mokia_prop.ytyp'
